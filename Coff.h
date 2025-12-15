@@ -96,5 +96,8 @@ class Coff
 public:
     static FullCoff* parseCoffFile(BYTE* coffFileBytes, DWORD coffSize);
     static BOOL parseRelocations(FullCoff* fullCoff);
+
+private:
+    //static BOOL executeRelocation(FullCoff* fullCoff, CoffReloc* relocation, char* symbolName, BOOL isSection);
 };
 
