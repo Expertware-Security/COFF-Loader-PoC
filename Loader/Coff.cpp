@@ -47,14 +47,14 @@ BOOL executeRelocation(
 	// 8 bytes long (64 bits)
 	// absolute address relocation
 	if (relocation->type == IMAGE_REL_AMD64_ADDR64) {
-		std::cout << "        [+] IMAGE_REL_AMD64_ADDR64 reloc: " << symbolName << std::endl;
+		std::cout << "    [+] IMAGE_REL_AMD64_ADDR64 reloc: " << symbolName << std::endl;
 	}
 	// 4 bytes long (32 bits)
 	// relative address relocation (relative to the RIP registry which will be at 4 bytes further from our symbol address)
 	else if (relocation->type == IMAGE_REL_AMD64_ADDR32NB) { // IMAGE_REL_AMD64_ADDR32NB is used by variable assembly commands
 		// FORMULA: relative_relocated_address = RVA of the actual symbol
 
-		std::cout << "        [+] IMAGE_REL_AMD64_ADDR32NB reloc: " << symbolName << std::endl;
+		std::cout << "    [+] IMAGE_REL_AMD64_ADDR32NB reloc: " << symbolName << std::endl;
 
 		if (coffSymbol->sectionNumber > 0) {
 			// calculate absolute address in COFF object
@@ -70,7 +70,7 @@ BOOL executeRelocation(
 				sizeof(uint32_t)); // copy 4 bytes
 		}
 		else {
-			std::cout << "        [!] Could not resolve IMAGE_REL_AMD64_ADDR32NB symbol: " << symbolName << " - section number 0" << std::endl;
+			std::cout << "    [!] Could not resolve IMAGE_REL_AMD64_ADDR32NB symbol: " << symbolName << " - section number 0" << std::endl;
 		}
 	}
 	// 4 bytes long (32 bits)
@@ -78,7 +78,7 @@ BOOL executeRelocation(
 	else if (relocation->type == IMAGE_REL_AMD64_REL32) { // IMAGE_REL_AMD64_REL32 is used by `call` and `jump`
 		// FORMULA: relative_relocated_address = absolute_address - (relocation_point_address+4); symbol_address+4 is actually where RIP would be located
 
-		std::cout << "        [+] IMAGE_REL_AMD64_REL32 reloc: " << symbolName << std::endl;
+		std::cout << "    [+] IMAGE_REL_AMD64_REL32 reloc: " << symbolName << std::endl;
 
 		// if the symbol is contained in another section, in the same object
 		if (isInternal) {
@@ -101,7 +101,7 @@ BOOL executeRelocation(
 
 			}
 			else {
-				std::cout << "        [!] Could not resolve IMAGE_REL_AMD64_REL32 symbol: " << symbolName << " - section number 0" << std::endl;
+				std::cout << "    [!] Could not resolve IMAGE_REL_AMD64_REL32 symbol: " << symbolName << " - section number 0" << std::endl;
 			}
 		}
 		else { // otherwise, the symbol is external, solved at runtime
@@ -112,7 +112,7 @@ BOOL executeRelocation(
 
 			}
 			else {
-				std::cout << "        [!] Could not resolve IMAGE_REL_AMD64_REL32 symbol: " << symbolName << " - unable to resolve external function" << std::endl;
+				std::cout << "    [!] Could not resolve IMAGE_REL_AMD64_REL32 symbol: " << symbolName << " - unable to resolve external function" << std::endl;
 			}
 		}
 	}
