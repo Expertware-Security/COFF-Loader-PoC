@@ -110,12 +110,52 @@ BOOL executeRelocation(
 
 			if (targetFunctionAddress != 0) {
 
+				// initially we will search for the address of target function, if it is present in the simulated GOT
+				uint32_t foundIdx = 0;
+
+				for (int i = 0; i < fullCoff->functionNumbered; i++) {
+					if (fullCoff->functionsArray[i] == targetFunctionAddress) {
+						foundIdx = i;
+						break;
+					}
+				}
+
+				// if we did not find it in simulated GOT
+				if (foundIdx == 0) {
+					// we will add it to the GOT
+					fullCoff->functionsArray[fullCoff->functionNumbered] = targetFunctionAddress;
+					foundIdx = fullCoff->functionNumbered;
+
+					// increment function number in simulated GOT
+					fullCoff->functionNumbered++;
+				}
+
+				// now `foundIdx` has the index of function to relocate
+
+				// absolute address of target found function
+				uint64_t absoluteAddress = (uint64_t)(fullCoff->functionsArray + foundIdx * sizeof(uint64_t));
+
+				// calculate absolute address to to the relocation position
+				uint64_t absoluteRelocationPosition = (uint64_t)(fullCoff->coffRawBytes + relocatedCoffSection->pointerToRawData + relocation->virtualAddress);
+
+				// calculate the relative address from relocation point address + 4 to the actual absolute position
+				uint32_t relativePosition = absoluteAddress - (absoluteRelocationPosition + 4); // + 4 because the symbol address is 4 bytes long
+
+				// execute relocation using function stub from simulated GOT
+				memcpy((void*)absoluteRelocationPosition,
+					&relativePosition,
+					sizeof(uint32_t));
+
+
 			}
 			else {
 				std::cout << "    [!] Could not resolve IMAGE_REL_AMD64_REL32 symbol: " << symbolName << " - unable to resolve external function" << std::endl;
 			}
 		}
 	}
+
+	std::cout << "    [+] Relocated symbol: " << symbolName << std::endl;
+
 
 	return TRUE;
 }
@@ -144,6 +184,12 @@ FullCoff* Coff::parseCoffFile(BYTE* coffFileBytes, DWORD coffSize) {
 	}
 
 	fullCoff->coffRawBytes = coffFileBytes;
+
+	// we will support only 1024 functions to relocate; it's a BOF so I think it should be enough
+	fullCoff->functionsArray = (uint64_t*)malloc(1024 * sizeof(uint64_t));
+
+	// number of functions will be initialized with 0
+	fullCoff->functionNumbered = 0;
 
 	return fullCoff;
 }

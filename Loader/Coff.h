@@ -93,6 +93,12 @@ struct FullCoff {
     BYTE* coffRawBytes;
     CoffHeader* coffHeader;
     CoffSectionHeader** coffSectionHeaders;
+
+    // this will simulate a GOT implementation ;
+    // it will store the pointers to the functions that are needed to operate,
+    // so that the relative address written in `IMAGE_REL_AMD64_REL32` will have only 32 bits
+    uint64_t* functionsArray;
+    uint32_t functionNumbered = 0;
 };
 
 class Coff
