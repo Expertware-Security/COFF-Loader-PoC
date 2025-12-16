@@ -1,33 +1,33 @@
 #include "Coff.h"
 
 #pragma region PrivateRegions
-BOOL executeRelocation(FullCoff* fullCoff, CoffReloc* relocation, CoffSectionHeader* relocatedCoffSection, char* symbolName, BOOL isSection)
+BOOL executeRelocation(
+	FullCoff* fullCoff,
+	CoffReloc* relocation,
+	CoffSectionHeader* relocatedCoffSection,
+	char* symbolName,
+	CoffSymbol* coffSymbol,
+	BOOL isInternal
+)
 {
 	std::cout << "[+] Relocating " << symbolName << std::endl;
 
-	// resolve relocation
-	uint32_t targetAddress = NULL;
+	// resolve relocation of external functions
+	uint64_t targetFunctionAddress = 0;
 
-	if (isSection) {
-		// we will calculate the relative offset to the target section
-		for (int i = 0; i < fullCoff->coffHeader->numberOfSections; i++) {
-			if (strcmp(fullCoff->coffSectionHeaders[i]->name, symbolName) == 0) { // check if the section name is the one we are looking for
-				targetAddress = fullCoff->coffSectionHeaders[i]->pointerToRawData;
-				break;
-			}
-		}
-	}
-	else {
+	if (!isInternal){
+		char* symbolNameCopy = _strdup(symbolName);
+
 		char* buffer = NULL; // this should store library name and function name
 		
 		char* ctx = NULL;
 
-		buffer = strtok_s(symbolName, "$", &ctx); // now buffer will have library name
+		buffer = strtok_s(symbolNameCopy, "$", &ctx); // now buffer will have library name
 
 		// retrieve library
 		HMODULE library = NULL;
 
-		// if the library name starts with `__imp_` (some have this name, dunno why :))
+		// if the library name starts with `__imp_` it means it is external
 		if(strncmp("__imp_", buffer, 6) == 0)
 			library = LoadLibraryA((char*)(buffer+6));
 		else
@@ -38,16 +38,83 @@ BOOL executeRelocation(FullCoff* fullCoff, CoffReloc* relocation, CoffSectionHea
 		// retrieve function address
 		FARPROC functionAddress = GetProcAddress(library, buffer);
 
-		// no cleanup needed for shitty STL functions
+		targetFunctionAddress = (uint64_t)functionAddress;
+
+		// cleanup
+		free(symbolNameCopy);
 	}
 
-	if (targetAddress == NULL) {
-		std::cout << "[!] Could not perform relocation for " << symbolName << std::endl;
-		return FALSE;
+	// 8 bytes long (64 bits)
+	// absolute address relocation
+	if (relocation->type == IMAGE_REL_AMD64_ADDR64) {
+		std::cout << "        [+] IMAGE_REL_AMD64_ADDR64 reloc: " << symbolName << std::endl;
 	}
+	// 4 bytes long (32 bits)
+	// relative address relocation (relative to the RIP registry which will be at 4 bytes further from our symbol address)
+	else if (relocation->type == IMAGE_REL_AMD64_ADDR32NB) { // IMAGE_REL_AMD64_ADDR32NB is used by variable assembly commands
+		// FORMULA: relative_relocated_address = RVA of the actual symbol
 
-	if (relocation->type == IMAGE_REL_AMD64_REL32) {
-		
+		std::cout << "        [+] IMAGE_REL_AMD64_ADDR32NB reloc: " << symbolName << std::endl;
+
+		if (coffSymbol->sectionNumber > 0) {
+			// calculate absolute address in COFF object
+			uint32_t absoluteAddress = (uint32_t)(fullCoff->coffRawBytes
+				+ fullCoff->coffSectionHeaders[coffSymbol->sectionNumber - 1]->pointerToRawData
+				+ coffSymbol->value);
+
+			// compute relative address
+			uint32_t rva = (uint32_t)(absoluteAddress - (uint32_t)fullCoff->coffRawBytes);
+
+			memcpy((fullCoff->coffRawBytes + relocatedCoffSection->pointerToRawData + relocation->virtualAddress), // calculate the absolute address to the first byte that needs relocation
+				&rva,              // RVA address to replace
+				sizeof(uint32_t)); // copy 4 bytes
+		}
+		else {
+			std::cout << "        [!] Could not resolve IMAGE_REL_AMD64_ADDR32NB symbol: " << symbolName << " - section number 0" << std::endl;
+		}
+	}
+	// 4 bytes long (32 bits)
+	// relative address relocation (relative to the RIP registry which will be at 4 bytes further from our symbol address)
+	else if (relocation->type == IMAGE_REL_AMD64_REL32) { // IMAGE_REL_AMD64_REL32 is used by `call` and `jump`
+		// FORMULA: relative_relocated_address = absolute_address - (relocation_point_address+4); symbol_address+4 is actually where RIP would be located
+
+		std::cout << "        [+] IMAGE_REL_AMD64_REL32 reloc: " << symbolName << std::endl;
+
+		// if the symbol is contained in another section, in the same object
+		if (isInternal) {
+			if (coffSymbol->sectionNumber > 0) {
+				// calculate absolute address in COFF object
+				uint64_t absoluteAddress = (uint64_t)(fullCoff->coffRawBytes // we use uint64_t because we are on 64 bits and addresses are uint64_t
+					+ fullCoff->coffSectionHeaders[coffSymbol->sectionNumber - 1]->pointerToRawData
+					+ coffSymbol->value);
+
+				// calculate absolute address to to the relocation position
+				uint64_t absoluteRelocationPosition = (uint64_t) (fullCoff->coffRawBytes + relocatedCoffSection->pointerToRawData + relocation->virtualAddress);
+				// we use uint64_t because we are on 64 bits and addresses are uint64_t
+
+				// calculate the relative address from relocation point address + 4 to the actual absolute position
+				uint32_t relativePosition = absoluteAddress - (absoluteRelocationPosition + 4); // + 4 because the symbol address is 4 bytes long
+
+				memcpy((void*)absoluteRelocationPosition,
+					&relativePosition,
+					sizeof(uint32_t));
+
+			}
+			else {
+				std::cout << "        [!] Could not resolve IMAGE_REL_AMD64_REL32 symbol: " << symbolName << " - section number 0" << std::endl;
+			}
+		}
+		else { // otherwise, the symbol is external, solved at runtime
+			// simulate GOT (global offset table) for functions
+			// this is done to keep the relative address under 32 bit data
+
+			if (targetFunctionAddress != 0) {
+
+			}
+			else {
+				std::cout << "        [!] Could not resolve IMAGE_REL_AMD64_REL32 symbol: " << symbolName << " - unable to resolve external function" << std::endl;
+			}
+		}
 	}
 
 	return TRUE;
@@ -71,18 +138,10 @@ FullCoff* Coff::parseCoffFile(BYTE* coffFileBytes, DWORD coffSize) {
 		// POINTER_TO_COFF + HEADER + SECTION_SIZE * ITERATION_NUMBER
 		CoffSectionHeader* tempSectionHeader = (CoffSectionHeader*)(coffFileBytes + sizeof(CoffHeader) + i * sizeof(CoffSectionHeader));
 
-		// avoid false sections
-		if (tempSectionHeader->name[0] != '.')
-			continue;
-
 		std::cout << "[+] Found section: " << tempSectionHeader->name << std::endl;
 
 		fullCoff->coffSectionHeaders[i] = tempSectionHeader;
-		realSectionNumbers++;
 	}
-
-	// write real number of sections
-	fullCoff->coffHeader->numberOfSections = realSectionNumbers;
 
 	fullCoff->coffRawBytes = coffFileBytes;
 
@@ -114,13 +173,13 @@ BOOL Coff::parseRelocations(FullCoff* fullCoff) {
 					std::cout << "    [+] Symbol " << symbolNameTemp << " in section " << fullCoff->coffSectionHeaders[i]->name << std::endl;
 
 					// execute function reloc
-					executeRelocation(fullCoff, relocations[j], fullCoff->coffSectionHeaders[i], symbolNameTemp, FALSE);
+					executeRelocation(fullCoff, relocations[j], fullCoff->coffSectionHeaders[i], symbolNameTemp, tempCoffSymbol, FALSE);
 				}
 				else {
 					std::cout << "    [+] Symbol " << tempCoffSymbol->first.name << " in section " << fullCoff->coffSectionHeaders[i]->name << std::endl;
 				
 					// execute section reloc
-					executeRelocation(fullCoff, relocations[j], fullCoff->coffSectionHeaders[i], tempCoffSymbol->first.name, TRUE);
+					executeRelocation(fullCoff, relocations[j], fullCoff->coffSectionHeaders[i], tempCoffSymbol->first.name, tempCoffSymbol, TRUE);
 				}
 			}
 

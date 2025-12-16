@@ -68,8 +68,12 @@ struct CoffSymbol {
         char     name[8];  // if name length is greater than 8 characters,
         uint32_t value[2]; // value will contain the offset in Symbol String Table
     } first;
+    // `value` will contain the relative value of the symbol, according to the section where the symbol is defined
+    // it may be 0 if the `sectionNumber` is 0
     uint32_t    value;
-    uint16_t    sectionNumber;
+    uint16_t    sectionNumber; // defines in which section is the symbol defined (if the symbol is external, then the section refers to the other COFF object)
+    // `sectionNumber` starts indexing at 1 (strange)
+    
     uint16_t    type;
     uint8_t     storageClass;
     uint8_t     numberOfAuxSymbols;
