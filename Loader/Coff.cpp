@@ -1,5 +1,8 @@
 #include "Coff.h"
 
+// this header contains Beacon functions from CobaltStrike
+#include "BeaconCompatibility.h"
+
 #pragma region PrivateRegions
 BOOL executeRelocation(
 	FullCoff* fullCoff,
