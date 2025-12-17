@@ -4,7 +4,7 @@
 #include "BeaconCompatibility.h"
 
 #pragma region PrivateRegions
-BOOL executeRelocation(
+BOOL Coff::executeRelocation(
 	FullCoff* fullCoff,
 	CoffReloc* relocation,
 	CoffSectionHeader* relocatedCoffSection,
@@ -51,6 +51,9 @@ BOOL executeRelocation(
 	// absolute address relocation
 	if (relocation->type == IMAGE_REL_AMD64_ADDR64) {
 		std::cout << "    [+] IMAGE_REL_AMD64_ADDR64 reloc: " << symbolName << std::endl;
+
+		// to be implemented
+
 	}
 	// 4 bytes long (32 bits)
 	// relative address relocation (relative to the RIP registry which will be at 4 bytes further from our symbol address)
@@ -111,6 +114,9 @@ BOOL executeRelocation(
 			// simulate GOT (global offset table) for functions
 			// this is done to keep the relative address under 32 bit data
 
+			// this works because the compiler will eventually generate assembly code similat with `call PTR[RIP + displacement]`
+			// so there is no direct call
+
 			if (targetFunctionAddress == 0) {
 				// suppose this is an internal function offered by Cobalt Strike exposed API
 				std::cout << "    [!] Could not resolve IMAGE_REL_AMD64_REL32 symbol: " << symbolName << " - unable to resolve function, trying to resolve it internally with exposed API" << std::endl;
@@ -129,7 +135,8 @@ BOOL executeRelocation(
 					// check if our stored symbol is equal to the exposed function
 					if (strncmp(symbolNameCopyPtrCp,
 						(const char*)InternalFunctions[i][0],
-						min(strlen(symbolNameCopyPtrCp), strlen((const char*)InternalFunctions[i][0])))) // this is a safe mechanism to not read out of bounds
+						min(strlen(symbolNameCopyPtrCp), strlen((const char*)InternalFunctions[i][0])))
+						== 0) // this is a safe mechanism to not read out of bounds
 						targetFunctionAddress = (uint64_t)InternalFunctions[i][1];
 					break;
 				}
@@ -263,5 +270,55 @@ BOOL Coff::parseRelocations(FullCoff* fullCoff) {
 	}
 
 	return TRUE;
+}
+
+BOOL Coff::executeCoffFunction(FullCoff* fullCoff, char* functionName, char* args, unsigned long argSize) {
+	uint32_t textSectionIdx = -1;
+
+	// first we will get the .text section to search for target function symbol
+	for (int i = 0; i < fullCoff->coffHeader->numberOfSections; i++) {
+
+		// get the section header
+		CoffSectionHeader* tempSectionHeader = (CoffSectionHeader*)(fullCoff->coffRawBytes + sizeof(CoffHeader) + i * sizeof(CoffSectionHeader));
+
+		if (strncmp(tempSectionHeader->name, ".text", 5) == 0) {
+			textSectionIdx = i;
+			break;
+		}
+	}
+
+	// fallback case if test section is not found
+	if (textSectionIdx == -1) {
+		std::cout << "[!] Unable to find `.text` section." << std::endl;
+		return FALSE;
+	}
+
+	// define function variable
+	VOID(*func)(char* in, uint32_t datalen) = NULL;
+
+	// iterate all symbols
+	for (int i = 0; i < fullCoff->coffHeader->numberOfSymbols; i++) {
+		CoffSymbol* tempSymbol = (CoffSymbol*)(fullCoff->coffRawBytes + fullCoff->coffHeader->pointerToSymbolTable // get to the symbol table absolute address
+			+ i * sizeof(CoffSymbol));
+
+		// if the symbol name is equal with the function we are looking for
+		if(strncmp(tempSymbol->first.name, functionName, min(strlen(tempSymbol->first.name), strlen(functionName))) == 0){
+
+			func = (void(*)(char* in, uint32_t datalen))(fullCoff->coffRawBytes + fullCoff->coffSectionHeaders[textSectionIdx]->pointerToRawData // go to the text section absolute address
+				+ tempSymbol->value); // add symbol relative offset
+		}
+	}
+
+	if (func) {
+		func((char*)args, argSize);
+		std::cout << "[+] Executed BOF function " << functionName << std::endl;
+	}
+	else {
+		std::cout << "[!] Unable to execute function " << functionName << std::endl;
+		return FALSE;
+	}
+
+	return TRUE;
+
 }
 #pragma endregion

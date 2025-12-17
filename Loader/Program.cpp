@@ -2,8 +2,14 @@
 #include <iostream>
 #include "Coff.h"
 
+// used for Cobalt Strike compatibility
+#include "BeaconCompatibility.h"
+
 int main()
 {
+    int bofOutdataSize = 0;
+    char* bofOutdata = NULL;
+
     wchar_t objectFilePath[MAX_PATH] = L"C:\\Users\\Administrator\\Documents\\BOF-Samples\\SA\\whoami\\whoami.x64.o";
 
     // read file bytes
@@ -29,12 +35,33 @@ int main()
     
     CloseHandle(coffHandle);
 
+    // modify memory protections to allow read, write, execute on the sections
+    DWORD oldProtect = 0;
+    if (VirtualProtect(coffData, coffReadSize, PAGE_EXECUTE_READWRITE, &oldProtect) == 0) {
+        std::cout << "[!] `VirtualProtect` failed to allow eecute on memory." << std::endl;
+        return 0;
+    }
+
     // parse COFF file
     FullCoff* fullCoff = Coff::parseCoffFile(coffData, coffFileSize);
 
     if (!Coff::parseRelocations(fullCoff)) {
         std::cout << "[!] Something went wrong parsing relocations" << std::endl;
         goto cleanup;
+    }
+
+    if (!Coff::executeCoffFunction(fullCoff, (char*)"go", NULL, 0)) {
+        goto cleanup;
+    }
+
+    // get outpput from BOF (Cobalt Strike style)
+    bofOutdata = BeaconGetOutputData(&bofOutdataSize);
+    if (bofOutdata != NULL) {
+        std::cout << "[+] Retrieved BOF output:" << std::endl;
+        std::cout << bofOutdata << std::endl;
+    }
+    else {
+        std::cout << "[!] Error retrieving BOF output." << std::endl;
     }
 
     // cleanup
