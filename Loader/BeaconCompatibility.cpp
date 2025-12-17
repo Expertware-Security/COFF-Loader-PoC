@@ -29,7 +29,7 @@
 
 
  /* Data Parsing */
-unsigned char* InternalFunctions[30][2] = {
+unsigned char* InternalFunctions[INTERNAL_FUNCTIONS_COUNT][2] = {
     {(unsigned char*)"BeaconDataParse", (unsigned char*)BeaconDataParse},
     {(unsigned char*)"BeaconDataInt", (unsigned char*)BeaconDataInt},
     {(unsigned char*)"BeaconDataShort", (unsigned char*)BeaconDataShort},

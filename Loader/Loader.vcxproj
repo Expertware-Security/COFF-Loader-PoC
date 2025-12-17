@@ -19,10 +19,12 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="BeaconCompatibility.cpp" />
     <ClCompile Include="Coff.cpp" />
     <ClCompile Include="Program.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="BeaconCompatibility.h" />
     <ClInclude Include="Coff.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

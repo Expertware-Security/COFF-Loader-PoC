@@ -14,7 +14,10 @@
 
 #ifndef BEACON_COMPATIBILITY_H_
  /* Structures as is in beacon.h */
-extern unsigned char* InternalFunctions[30][2];
+
+#define INTERNAL_FUNCTIONS_COUNT 30
+
+extern unsigned char* InternalFunctions[INTERNAL_FUNCTIONS_COUNT][2];
 
 typedef struct {
     char* original; /* the original buffer [so we can free it] */

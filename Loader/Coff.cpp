@@ -13,7 +13,7 @@ BOOL executeRelocation(
 	BOOL isInternal
 )
 {
-	std::cout << "[+] Relocating " << symbolName << std::endl;
+	std::cout << "    [+] Relocating " << symbolName << std::endl;
 
 	// resolve relocation of external functions
 	uint64_t targetFunctionAddress = 0;
@@ -111,6 +111,33 @@ BOOL executeRelocation(
 			// simulate GOT (global offset table) for functions
 			// this is done to keep the relative address under 32 bit data
 
+			if (targetFunctionAddress == 0) {
+				// suppose this is an internal function offered by Cobalt Strike exposed API
+				std::cout << "    [!] Could not resolve IMAGE_REL_AMD64_REL32 symbol: " << symbolName << " - unable to resolve function, trying to resolve it internally with exposed API" << std::endl;
+
+				char* symbolNameCopy = _strdup(symbolName);
+
+				char* symbolNameCopyPtrCp = symbolNameCopy;
+
+				// get symbol without `__imp_` if needed
+				if (strncmp("__imp_", symbolNameCopy, 6) == 0)
+					symbolNameCopyPtrCp = (char*)(symbolNameCopyPtrCp + 6);
+
+
+				// iterate through internal functions to find our target function
+				for (int i = 0; i < INTERNAL_FUNCTIONS_COUNT; i++) {
+					// check if our stored symbol is equal to the exposed function
+					if (strncmp(symbolNameCopyPtrCp,
+						(const char*)InternalFunctions[i][0],
+						min(strlen(symbolNameCopyPtrCp), strlen((const char*)InternalFunctions[i][0])))) // this is a safe mechanism to not read out of bounds
+						targetFunctionAddress = (uint64_t)InternalFunctions[i][1];
+					break;
+				}
+
+				// cleanup
+				free(symbolNameCopy);
+			}
+
 			if (targetFunctionAddress != 0) {
 
 				// initially we will search for the address of target function, if it is present in the simulated GOT
@@ -152,7 +179,7 @@ BOOL executeRelocation(
 
 			}
 			else {
-				std::cout << "    [!] Could not resolve IMAGE_REL_AMD64_REL32 symbol: " << symbolName << " - unable to resolve external function" << std::endl;
+				std::cout << "    [!] Could not resolve IMAGE_REL_AMD64_REL32 symbol: " << symbolName << " - unable to resolve function" << std::endl;
 			}
 		}
 	}
@@ -219,13 +246,13 @@ BOOL Coff::parseRelocations(FullCoff* fullCoff) {
 						+ fullCoff->coffHeader->numberOfSymbols * sizeof(CoffSymbol)) // table of symbols is in the end of the Symbols sections
 																					  // so we will skip them all
 						+ tempCoffSymbol->first.value[1]; // value[1] contains the offset in Table of Symbol Strings
-					std::cout << "    [+] Symbol " << symbolNameTemp << " in section " << fullCoff->coffSectionHeaders[i]->name << std::endl;
+					std::cout << "[+] Symbol " << symbolNameTemp << " in section " << fullCoff->coffSectionHeaders[i]->name << std::endl;
 
 					// execute function reloc
 					executeRelocation(fullCoff, relocations[j], fullCoff->coffSectionHeaders[i], symbolNameTemp, tempCoffSymbol, FALSE);
 				}
 				else {
-					std::cout << "    [+] Symbol " << tempCoffSymbol->first.name << " in section " << fullCoff->coffSectionHeaders[i]->name << std::endl;
+					std::cout << "[+] Symbol " << tempCoffSymbol->first.name << " in section " << fullCoff->coffSectionHeaders[i]->name << std::endl;
 				
 					// execute section reloc
 					executeRelocation(fullCoff, relocations[j], fullCoff->coffSectionHeaders[i], tempCoffSymbol->first.name, tempCoffSymbol, TRUE);

@@ -21,9 +21,15 @@
     <ClCompile Include="Program.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="BeaconCompatibility.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Coff.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="BeaconCompatibility.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
