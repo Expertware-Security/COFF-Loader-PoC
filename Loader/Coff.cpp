@@ -137,8 +137,10 @@ BOOL Coff::executeRelocation(
 						(const char*)InternalFunctions[i][0],
 						min(strlen(symbolNameCopyPtrCp), strlen((const char*)InternalFunctions[i][0])))
 						== 0) // this is a safe mechanism to not read out of bounds
+					{
 						targetFunctionAddress = (uint64_t)InternalFunctions[i][1];
-					break;
+						break;
+					}
 				}
 
 				// cleanup
@@ -148,7 +150,7 @@ BOOL Coff::executeRelocation(
 			if (targetFunctionAddress != 0) {
 
 				// initially we will search for the address of target function, if it is present in the simulated GOT
-				uint32_t foundIdx = 0;
+				int foundIdx = -1;
 
 				for (int i = 0; i < fullCoff->functionNumbered; i++) {
 					if (fullCoff->functionsArray[i] == targetFunctionAddress) {
@@ -158,7 +160,7 @@ BOOL Coff::executeRelocation(
 				}
 
 				// if we did not find it in simulated GOT
-				if (foundIdx == 0) {
+				if (foundIdx == -1) {
 					// we will add it to the GOT
 					fullCoff->functionsArray[fullCoff->functionNumbered] = targetFunctionAddress;
 					foundIdx = fullCoff->functionNumbered;
@@ -273,7 +275,7 @@ BOOL Coff::parseRelocations(FullCoff* fullCoff) {
 }
 
 BOOL Coff::executeCoffFunction(FullCoff* fullCoff, char* functionName, char* args, unsigned long argSize) {
-	uint32_t textSectionIdx = -1;
+	int textSectionIdx = -1;
 
 	// first we will get the .text section to search for target function symbol
 	for (int i = 0; i < fullCoff->coffHeader->numberOfSections; i++) {
