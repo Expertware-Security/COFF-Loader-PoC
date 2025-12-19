@@ -35,15 +35,19 @@ int main()
     
     CloseHandle(coffHandle);
 
-    // modify memory protections to allow read, write, execute on the sections
-    DWORD oldProtect = 0;
-    if (VirtualProtect(coffData, coffReadSize, PAGE_EXECUTE_READWRITE, &oldProtect) == 0) {
-        std::cout << "[!] `VirtualProtect` failed to allow eecute on memory." << std::endl;
+    // map coff in memory
+    LPVOID fullCoffMapped = VirtualAlloc(NULL, coffReadSize, MEM_COMMIT, PAGE_EXECUTE_READWRITE);
+
+    if (fullCoffMapped == NULL) {
+        std::cout << "[!] VirtualAlloc failed" << std::endl;
         return 0;
     }
 
+    // copy COFF data in our buffer
+    RtlCopyMemory(fullCoffMapped, coffData, coffReadSize);
+
     // parse COFF file
-    FullCoff* fullCoff = Coff::parseCoffFile(coffData, coffFileSize);
+    FullCoff* fullCoff = Coff::parseCoffFile((BYTE*)fullCoffMapped, coffFileSize);
 
     if (!Coff::parseRelocations(fullCoff)) {
         std::cout << "[!] Something went wrong parsing relocations" << std::endl;
@@ -66,8 +70,17 @@ int main()
 
     // cleanup
 cleanup:
+
+    free(fullCoff->functionsArray);
+
+    for (int i = 0; i < fullCoff->coffHeader->numberOfSections; i++) {
+        VirtualFree(fullCoff->coffSections[i], fullCoff->coffSectionHeaders[i]->sizeOfRawData, MEM_RELEASE);
+        VirtualFree(fullCoff->coffSectionHeaders[i], sizeof(CoffSectionHeader), MEM_RELEASE);
+    }
+
     free(fullCoff->coffSectionHeaders);
-    free(fullCoff);
+    free(fullCoff->coffSections);
+    VirtualFree(fullCoff, coffReadSize, MEM_RELEASE);
 
     return 0;
 }

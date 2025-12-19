@@ -93,6 +93,7 @@ struct FullCoff {
     BYTE* coffRawBytes;
     CoffHeader* coffHeader;
     CoffSectionHeader** coffSectionHeaders;
+    void** coffSections; // store sections mapped in memory
 
     // this will simulate a GOT implementation ;
     // it will store the pointers to the functions that are needed to operate,
@@ -109,6 +110,7 @@ public:
     static BOOL executeCoffFunction(FullCoff* fullCoff, char* functionName, char* args, unsigned long argSize);
 
 private:
+    /*
     static BOOL executeRelocation(
     FullCoff* fullCoff,
         CoffReloc* relocation,
@@ -117,5 +119,6 @@ private:
         CoffSymbol* coffSymbol,
         BOOL isInternal
     );
+    */
 };
 
