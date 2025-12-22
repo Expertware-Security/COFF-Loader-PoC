@@ -16,9 +16,22 @@ BOOL executeRelocation(
 	// 8 bytes long (64 bits)
 	// absolute address relocation
 	if (relocation->type == IMAGE_REL_AMD64_ADDR64) {
+		// this case is pretty straight forward, we need to calculate the absolute 64 bit address of the symbol and replace it
+		uint64_t absoluteOffset = 0;
 
-		// to be implemented
+		// we will get the offset address of the symbol. stored at the target memory address
+		memcpy(&absoluteOffset, (void*)((char*)fullCoff->coffSections[sectionNumber] + relocation->virtualAddress), sizeof(uint32_t));
 
+		// we will add the symbol source section offset to the absoluteOffset
+		absoluteOffset = (uint64_t)((char*)fullCoff->coffSections[coffSymbol->sectionNumber - 1] + absoluteOffset) + (uint64_t)absoluteOffset;
+
+		// finally, we will add the symbol offset
+		absoluteOffset += coffSymbol->value;
+
+		// and we will copy 64 bit address to it
+		memcpy(((char*)fullCoff->coffSections[sectionNumber] + relocation->virtualAddress), // calculate the absolute address to the first byte that needs relocation
+			&absoluteOffset,              // RVA address to replace
+			sizeof(uint64_t)); // copy 4 bytes
 	}
 	// 4 bytes long (32 bits)
 	// relative address relocation (relative to the RIP registry which will be at 4 bytes further from our symbol address)
@@ -63,7 +76,7 @@ BOOL executeRelocation(
 			offsetAddr = (uint32_t)(((char*)fullCoff->functionsArray + fullCoff->functionNumbered * sizeof(uint64_t))
 				- ((char*)fullCoff->coffSections[sectionNumber] + relocation->virtualAddress + 4));
 
-			// add the Symbol offset
+			// add the Symbol offset, which in this case will always be 0
 			offsetAddr += coffSymbol->value;
 
 			memcpy(((char*)fullCoff->coffSections[sectionNumber] + relocation->virtualAddress), // calculate the absolute address to the first byte that needs relocation
@@ -79,9 +92,8 @@ BOOL executeRelocation(
 			uint32_t offsetAddr = 0;
 			memcpy(&offsetAddr, (void*)((char*)fullCoff->coffSections[sectionNumber] + relocation->virtualAddress), sizeof(uint32_t));
 
-			offsetAddr += (((char*)fullCoff->coffSections[coffSymbol->sectionNumber - 1])
+			offsetAddr = (((char*)fullCoff->coffSections[coffSymbol->sectionNumber - 1] + offsetAddr)
 				- ((char*)fullCoff->coffSections[sectionNumber] + relocation->virtualAddress + 4));
-
 
 			// add the Symbol offset
 			offsetAddr += coffSymbol->value;
@@ -172,17 +184,21 @@ BOOL Coff::parseRelocations(FullCoff* fullCoff) {
 
 				if (tempCoffSymbol->first.name[0] == 0) {
 					// the symbol offset is found in value[1] (because value[0] contains '\0' which is the end str of the name - we have union, not struct)
-					char* symbolNameTemp = (char*)(fullCoff->coffRawBytes + fullCoff->coffHeader->pointerToSymbolTable 
+					char* symbolNameOriginal = (char*)(fullCoff->coffRawBytes + fullCoff->coffHeader->pointerToSymbolTable 
 						+ fullCoff->coffHeader->numberOfSymbols * sizeof(CoffSymbol)) // table of symbols is in the end of the Symbols sections
 																					  // so we will skip them all
 						+ tempCoffSymbol->first.value[1]; // value[1] contains the offset in Table of Symbol Strings
+
+					// we have to copy it to not modify the memory itself, otherwise, when solving a function, we will also change memory with strtok_s
+					char* symbolNameTemp = _strdup(symbolNameOriginal);
+
 					std::cout << "[+] Symbol " << symbolNameTemp << " in section " << fullCoff->coffSectionHeaders[i]->name << std::endl;
 
 					bool internalFunction = FALSE;
 
 					void* funcPtr = NULL;
 
-					if (strcmp(symbolNameTemp, "__imp_")) {
+					if (strncmp(symbolNameTemp, "__imp_", 6) == 0) {
 						symbolNameTemp = symbolNameTemp + 6;
 					}
 
@@ -211,7 +227,7 @@ BOOL Coff::parseRelocations(FullCoff* fullCoff) {
 						char* localLib = strtok_s(symbolNameTemp, "$", &ctx);
 
 						// load a library and map it to memory
-						HMODULE libHandle = GetModuleHandleA(localLib);
+						HMODULE libHandle = LoadLibraryA(localLib);
 
 						// get function string 
 						char* localFunc = strtok_s(NULL, "$", &ctx);
@@ -277,9 +293,7 @@ BOOL Coff::executeCoffFunction(FullCoff* fullCoff, char* functionName, char* arg
 	}
 
 	if (func) {
-		std::cout << "[+] Found function at address " << func << ". Press enter `go` and enter to execute." << std::endl;
-		int temp = 0;
-		std::cin >> temp;
+		std::cout << "[+] Found function at address " << func << "." << std::endl;
 
 		func((char*)args, argSize);
 		std::cout << "[+] Executed BOF function " << functionName << std::endl;

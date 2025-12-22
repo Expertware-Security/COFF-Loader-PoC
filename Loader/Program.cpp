@@ -5,15 +5,19 @@
 // used for Cobalt Strike compatibility
 #include "BeaconCompatibility.h"
 
-int main()
+int main(int argc, char* argv[])
 {
+    if (argc != 3) {
+        std::cout << "Usage: \nLoader.exe {BOF path} {function}";
+        return 0;
+    }
+
     int bofOutdataSize = 0;
     char* bofOutdata = NULL;
 
-    wchar_t objectFilePath[MAX_PATH] = L"C:\\Users\\Administrator\\Documents\\BOF-Samples\\SA\\whoami\\whoami.x64.o";
 
     // read file bytes
-    HANDLE coffHandle = CreateFile(objectFilePath, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+    HANDLE coffHandle = CreateFileA(argv[1], GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (coffHandle == INVALID_HANDLE_VALUE) {
         std::cout << "[!] Could not open COFF file" << std::endl;
         return 0;
@@ -54,7 +58,8 @@ int main()
         goto cleanup;
     }
 
-    if (!Coff::executeCoffFunction(fullCoff, (char*)"go", NULL, 0)) {
+
+    if (!Coff::executeCoffFunction(fullCoff, argv[2], NULL, 0)) {
         goto cleanup;
     }
 
@@ -70,7 +75,7 @@ int main()
 
     // cleanup
 cleanup:
-
+    
     VirtualFree(fullCoff->functionsArray, fullCoff->relocationCount * sizeof(uint64_t), MEM_RELEASE);
 
     for (int i = 0; i < fullCoff->coffHeader->numberOfSections; i++) {
@@ -81,6 +86,7 @@ cleanup:
     free(fullCoff->coffSectionHeaders);
     free(fullCoff->coffSections);
     VirtualFree(fullCoff, coffReadSize, MEM_RELEASE);
+    
 
     return 0;
 }
