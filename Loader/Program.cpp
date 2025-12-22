@@ -71,7 +71,7 @@ int main()
     // cleanup
 cleanup:
 
-    free(fullCoff->functionsArray);
+    VirtualFree(fullCoff->functionsArray, fullCoff->relocationCount * sizeof(uint64_t), MEM_RELEASE);
 
     for (int i = 0; i < fullCoff->coffHeader->numberOfSections; i++) {
         VirtualFree(fullCoff->coffSections[i], fullCoff->coffSectionHeaders[i]->sizeOfRawData, MEM_RELEASE);

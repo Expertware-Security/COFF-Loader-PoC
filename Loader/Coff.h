@@ -100,6 +100,9 @@ struct FullCoff {
     // so that the relative address written in `IMAGE_REL_AMD64_REL32` will have only 32 bits
     uint64_t* functionsArray;
     uint32_t functionNumbered = 0;
+
+    // we will count the relocations to allocate enough memory in functions buffer size
+    uint32_t relocationCount = 0;
 };
 
 class Coff
