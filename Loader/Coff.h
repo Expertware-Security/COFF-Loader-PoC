@@ -113,15 +113,14 @@ public:
     static BOOL executeCoffFunction(FullCoff* fullCoff, char* functionName, char* args, unsigned long argSize);
 
 private:
-    /*
+    
     static BOOL executeRelocation(
-    FullCoff* fullCoff,
-        CoffReloc* relocation,
-        CoffSectionHeader* relocatedCoffSection,
-        char* symbolName,
-        CoffSymbol* coffSymbol,
-        BOOL isInternal
+	    FullCoff* fullCoff,
+	    CoffReloc* relocation,
+	    int sectionNumber,
+	    CoffSymbol* coffSymbol,
+	    void* functionPtr
     );
-    */
+    
 };
 

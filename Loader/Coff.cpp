@@ -4,7 +4,7 @@
 #include "BeaconCompatibility.h"
 
 #pragma region PrivateRegions
-BOOL executeRelocation(
+BOOL Coff::executeRelocation(
 	FullCoff* fullCoff,
 	CoffReloc* relocation,
 	int sectionNumber,
@@ -194,7 +194,6 @@ BOOL Coff::parseRelocations(FullCoff* fullCoff) {
 
 					std::cout << "[+] Symbol " << symbolNameTemp << " in section " << fullCoff->coffSectionHeaders[i]->name << std::endl;
 
-					bool internalFunction = FALSE;
 
 					void* funcPtr = NULL;
 
@@ -209,8 +208,6 @@ BOOL Coff::parseRelocations(FullCoff* fullCoff) {
 						strncmp(symbolNameTemp, "toWideChar", min(strlen(symbolNameTemp), strlen("toWideChar"))) == 0 ||
 						strncmp(symbolNameTemp, "LoadLibraryA", min(strlen(symbolNameTemp), strlen("LoadLibraryA"))) == 0 ||
 						strncmp(symbolNameTemp, "FreeLibrary", min(strlen(symbolNameTemp), strlen("FreeLibrary"))) == 0) {
-
-						internalFunction = TRUE;
 
 						for (int k = 0; k < 30; k++) {
 							// function found in internal functions array

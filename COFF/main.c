@@ -1,4 +1,4 @@
-#include <windows.h>
+#include <Windows.h>
 #include <stdio.h>
 #include <lm.h>
 #include <dsgetdc.h>
