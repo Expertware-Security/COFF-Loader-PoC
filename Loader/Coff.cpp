@@ -16,27 +16,32 @@ BOOL Coff::executeRelocation(
 	// 8 bytes long (64 bits)
 	// absolute address relocation
 	if (relocation->type == IMAGE_REL_AMD64_ADDR64) {
-		// this case is pretty straight forward, we need to calculate the absolute 64 bit address of the symbol and replace it
-		uint64_t absoluteOffset = 0;
+		if (coffSymbol->sectionNumber > 0) {
+			// this case is pretty straight forward, we need to calculate the absolute 64 bit address of the symbol and replace it
+			uint64_t absoluteOffset = 0;
 
-		// we will get the offset address of the symbol. stored at the target memory address
-		memcpy(&absoluteOffset, (void*)((char*)fullCoff->coffSections[sectionNumber] + relocation->virtualAddress), sizeof(uint32_t));
+			// we will get the offset address of the symbol. stored at the target memory address
+			memcpy(&absoluteOffset, (void*)((char*)fullCoff->coffSections[sectionNumber] + relocation->virtualAddress), sizeof(uint32_t));
 
-		// we will add the symbol source section offset to the absoluteOffset
-		absoluteOffset = (uint64_t)((char*)fullCoff->coffSections[coffSymbol->sectionNumber - 1] + absoluteOffset) + (uint64_t)absoluteOffset;
+			// we will add the symbol source section offset to the absoluteOffset
+			absoluteOffset = (uint64_t)((char*)fullCoff->coffSections[coffSymbol->sectionNumber - 1] + absoluteOffset) + (uint64_t)absoluteOffset;
 
-		// finally, we will add the symbol offset
-		absoluteOffset += coffSymbol->value;
+			// finally, we will add the symbol offset
+			absoluteOffset += coffSymbol->value;
 
-		// and we will copy 64 bit address to it
-		memcpy(((char*)fullCoff->coffSections[sectionNumber] + relocation->virtualAddress), // calculate the absolute address to the first byte that needs relocation
-			&absoluteOffset,              // RVA address to replace
-			sizeof(uint64_t)); // copy 4 bytes
+			// and we will copy 64 bit address to it
+			memcpy(((char*)fullCoff->coffSections[sectionNumber] + relocation->virtualAddress), // calculate the absolute address to the first byte that needs relocation
+				&absoluteOffset,   // absolute address
+				sizeof(uint64_t)); // copy 8 bytes
+		}
+		else {
+			return FALSE;
+		}
 	}
 	// 4 bytes long (32 bits)
 	// relative address relocation (relative to the RIP registry which will be at 4 bytes further from our symbol address)
 	else if (relocation->type == IMAGE_REL_AMD64_ADDR32NB) { // IMAGE_REL_AMD64_ADDR32NB is used by variable assembly commands
-		// FORMULA: relative_relocated_address = absolute_address - (relocation_point_address+4); symbol_address+4 is actually where RIP would be located
+		// FORMULA: relative_relocated_address = absolute_address - (relocation_point_address+4); relocation_point_address+4 is actually where RIP would be located
 
 
 		if (coffSymbol->sectionNumber > 0) {
@@ -56,6 +61,7 @@ BOOL Coff::executeRelocation(
 				sizeof(uint32_t)); // copy 4 bytes
 		}
 		else {
+			return FALSE;
 		}
 	}
 	// 4 bytes long (32 bits)

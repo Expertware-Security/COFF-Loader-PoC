@@ -80,7 +80,6 @@ cleanup:
 
     for (int i = 0; i < fullCoff->coffHeader->numberOfSections; i++) {
         VirtualFree(fullCoff->coffSections[i], fullCoff->coffSectionHeaders[i]->sizeOfRawData, MEM_RELEASE);
-        VirtualFree(fullCoff->coffSectionHeaders[i], sizeof(CoffSectionHeader), MEM_RELEASE);
     }
 
     free(fullCoff->coffSectionHeaders);
